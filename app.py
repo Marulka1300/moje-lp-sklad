@@ -20,7 +20,7 @@ with tab1:
     if uploaded_file:
         if st.button("Zpracovat fakturu"):
             with st.spinner("AI čte fakturu..."):
-                model = genai.GenerativeModel('models/gemini-1.5-flash')
+                model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
                 content = uploaded_file.read()
                 response = model.generate_content([
                     "Vrať CSV tabulku (středník): EAN;Interpret;Titul;Mnozstvi;Cena_s_DPH",
