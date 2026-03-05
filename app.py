@@ -6,6 +6,7 @@ import io
 st.set_page_config(page_title="LP Skladová Evidence", layout="wide")
 
 # --- NASTAVENÍ API ---
+# Klíč máte v pořádku, použijeme ho
 API_KEY = "AIzaSyBGEFTjQGFBHmLFDxrHKw-XaJW5guSUCJs"
 genai.configure(api_key=API_KEY)
 
@@ -20,24 +21,34 @@ with tab1:
     if uploaded_file:
         if st.button("Zpracovat fakturu"):
             with st.spinner("AI čte fakturu..."):
-                model = genai.GenerativeModel('models/gemini-1.5-flash')
-                content = uploaded_file.read()
-                response = model.generate_content([
-                    "Vrať CSV tabulku (středník): EAN;Interpret;Titul;Mnozstvi;Cena_s_DPH",
-                    {"mime_type": "application/pdf", "data": content}
-                ])
+                # ZKOUŠÍME VÍCE NÁZVŮ MODELŮ, ABYCHOM SE VYHNULI CHYBĚ 404
+                success = False
+                for model_name in ['gemini-1.5-flash', 'models/gemini-1.5-flash']:
+                    try:
+                        model = genai.GenerativeModel(model_name)
+                        content = uploaded_file.read()
+                        response = model.generate_content([
+                            "Vrať CSV tabulku (středník): EAN;Interpret;Titul;Mnozstvi;Cena_s_DPH. Jen čisté CSV.",
+                            {"mime_type": "application/pdf", "data": content}
+                        ])
+                        
+                        csv_data = response.text.replace('```csv', '').replace('```', '').strip()
+                        df = pd.read_csv(io.StringIO(csv_data), sep=';')
+                        st.session_state['sklad_priprava'] = df
+                        st.success(f"Faktura úspěšně načtena modelem {model_name}!")
+                        st.dataframe(df)
+                        success = True
+                        break
+                    except Exception as e:
+                        continue # Pokud tento název nefunguje, zkusíme další
                 
-                csv_data = response.text.replace('```csv', '').replace('```', '').strip()
-                df = pd.read_csv(io.StringIO(csv_data), sep=';')
-                st.session_state['sklad_priprava'] = df
-                st.success("Faktura načtena!")
-                st.dataframe(df)
+                if not success:
+                    st.error("Nepodařilo se spojit s Google AI. Zkuste to za chvíli nebo zkontrolujte připojení.")
 
 with tab2:
-    st.header("Fyzické naskladnění / Prodej")
-    ean_input = st.text_input("NAČTI EAN SKENEREM (nebo napiš)", key="ean_scanner")
-    
-    if ean_input:
-        st.info(f"Hledám v databázi EAN: {ean_input}")
-        # Zde později dopíšeme logiku pro porovnání s objednávkami
-        st.warning("Titul nalezen v objednávce č. 456! Nepouštět na sklad.")
+    st.header("Skladová databáze")
+    st.write("Zde bude seznam titulů a políčko pro skener.")
+    # Políčko pro skener
+    ean_scan = st.text_input("NAČTI EAN SKENEREM")
+    if ean_scan:
+        st.write(f"Naskenováno: {ean_scan}")
